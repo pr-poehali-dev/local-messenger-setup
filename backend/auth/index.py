@@ -4,11 +4,8 @@ import hashlib
 import secrets
 import psycopg2
 
-SALT = 'poehali_msgr_v1'
-
-
 def hash_password(password: str) -> str:
-    return hashlib.sha256((SALT + password).encode()).hexdigest()
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 def cors_headers():
