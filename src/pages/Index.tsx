@@ -203,8 +203,8 @@ const ChatsView = () => {
               <div className="flex items-center gap-2 bg-secondary rounded-xl px-2 md:px-3 py-1.5">
                 <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
                   placeholder="Сообщение..." className="flex-1 bg-transparent outline-none text-sm py-2 px-2" />
-                <button onClick={send} className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity">
-                  <Icon name="Send" size={16} />
+                <button onClick={send} className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity overflow-hidden">
+                  <img src="https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/bucket/dac09d13-dd77-4b3e-8e81-f1d8889018fe.png" alt="send" className="w-7 h-7 object-contain invert" />
                 </button>
               </div>
             </footer>
