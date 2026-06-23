@@ -57,15 +57,17 @@ def handler(event, context):
         cur.execute(
             "SELECT c.id, c.title, c.is_group, "
             "(SELECT body FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), "
-            "(SELECT to_char(created_at, 'HH24:MI') FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) "
+            "(SELECT to_char(created_at, 'HH24:MI') FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), "
+            "(SELECT cm2.user_id FROM conversation_members cm2 WHERE cm2.conversation_id = c.id AND cm2.user_id != %s LIMIT 1) "
             "FROM conversations c "
             "JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id = %s "
             "ORDER BY c.created_at DESC",
-            (uid,),
+            (uid, uid),
         )
         convs = [
             {'id': r[0], 'title': r[1], 'is_group': r[2],
-             'last': r[3] or 'Нет сообщений', 'time': r[4] or ''}
+             'last': r[3] or 'Нет сообщений', 'time': r[4] or '',
+             'other_user_id': r[5]}
             for r in cur.fetchall()
         ]
         cur.close()

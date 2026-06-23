@@ -31,6 +31,7 @@ export interface Conversation {
   is_group: boolean;
   last: string;
   time: string;
+  other_user_id: number | null;
 }
 
 export interface Message {
@@ -152,4 +153,19 @@ export async function createDialog(targetLogin: string) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Ошибка');
   return data as { id: number; title: string; ok: boolean; already_exists?: boolean };
+}
+
+export interface IncomingSignal {
+  id: number;
+  sender_id: number;
+  type: string;
+  payload: { mode?: string };
+}
+
+export async function pollSignals(conversationId: number, since: number): Promise<IncomingSignal[]> {
+  const res = await fetch(`${API.signaling}?conversation_id=${conversationId}&since=${since}`, {
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  return data.signals || [];
 }

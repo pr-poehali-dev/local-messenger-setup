@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import {
   fetchUsers, createAccount, setUserStatus, changePassword, updateProfile,
-  fetchConversations, fetchMessages, sendMessage, createDialog,
+  fetchConversations, fetchMessages, sendMessage, createDialog, pollSignals,
   AdminUser, AuditEntry, Conversation, Message, User,
 } from '@/lib/api';
+import CallModal, { CallMode } from '@/components/CallModal';
 
 type Tab = 'chats' | 'admin' | 'profile' | 'settings';
 
@@ -54,7 +55,17 @@ const Index = () => {
 };
 
 /* ---------- Chats ---------- */
+interface CallState {
+  conversationId: number;
+  recipientId: number;
+  recipientName: string;
+  mode: CallMode;
+  isIncoming: boolean;
+  incomingSignalId?: number;
+}
+
 const ChatsView = () => {
+  const { user } = useAuth();
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [active, setActive] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -63,6 +74,9 @@ const ChatsView = () => {
   const [showNew, setShowNew] = useState(false);
   const [newLogin, setNewLogin] = useState('');
   const [newLoading, setNewLoading] = useState(false);
+  const [call, setCall] = useState<CallState | null>(null);
+  const incomingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSigIdRef = useRef<number>(0);
 
   const loadConvs = () =>
     fetchConversations()
@@ -71,6 +85,34 @@ const ChatsView = () => {
       .finally(() => setLoading(false));
 
   useEffect(() => { loadConvs(); }, []);
+
+  // Polling входящих звонков по всем диалогам
+  useEffect(() => {
+    if (call) return;
+    incomingPollRef.current = setInterval(async () => {
+      for (const conv of convs) {
+        if (!conv.other_user_id) continue;
+        try {
+          const sigs = await pollSignals(conv.id, lastSigIdRef.current);
+          const callSig = sigs.find(s => s.type === 'call' && s.sender_id !== user?.id);
+          if (callSig) {
+            lastSigIdRef.current = callSig.id;
+            setCall({
+              conversationId: conv.id,
+              recipientId: callSig.sender_id,
+              recipientName: conv.title,
+              mode: (callSig.payload?.mode as CallMode) || 'audio',
+              isIncoming: true,
+              incomingSignalId: callSig.id,
+            });
+            break;
+          }
+          if (sigs.length) lastSigIdRef.current = sigs[sigs.length - 1].id;
+        } catch { /* ignore */ }
+      }
+    }, 2000);
+    return () => { if (incomingPollRef.current) clearInterval(incomingPollRef.current); };
+  }, [convs, call, user?.id]);
 
   useEffect(() => {
     if (active != null) fetchMessages(active).then(setMessages).catch(() => {});
@@ -181,10 +223,26 @@ const ChatsView = () => {
           <>
             <header className="h-[65px] border-b border-border px-4 md:px-6 flex items-center gap-3 bg-card">
               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">{initials(activeConv.title)}</div>
-              <div>
+              <div className="flex-1">
                 <div className="font-medium text-sm">{activeConv.title}</div>
                 <div className="text-xs text-primary">локальный сервер</div>
               </div>
+              {activeConv.other_user_id && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCall({ conversationId: activeConv.id, recipientId: activeConv.other_user_id!, recipientName: activeConv.title, mode: 'audio', isIncoming: false })}
+                    className="w-9 h-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center justify-center transition-colors"
+                    title="Аудиозвонок">
+                    <Icon name="Phone" size={17} />
+                  </button>
+                  <button
+                    onClick={() => setCall({ conversationId: activeConv.id, recipientId: activeConv.other_user_id!, recipientName: activeConv.title, mode: 'video', isIncoming: false })}
+                    className="w-9 h-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center justify-center transition-colors"
+                    title="Видеозвонок">
+                    <Icon name="Video" size={17} />
+                  </button>
+                </div>
+              )}
             </header>
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-3">
               {messages.map((m, i) => (
@@ -213,6 +271,18 @@ const ChatsView = () => {
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Выберите диалог</div>
         )}
       </main>
+
+      {call && (
+        <CallModal
+          conversationId={call.conversationId}
+          recipientId={call.recipientId}
+          recipientName={call.recipientName}
+          mode={call.mode}
+          isIncoming={call.isIncoming}
+          incomingSignalId={call.incomingSignalId}
+          onClose={() => setCall(null)}
+        />
+      )}
     </>
   );
 };
