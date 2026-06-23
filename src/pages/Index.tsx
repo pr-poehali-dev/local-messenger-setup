@@ -129,7 +129,12 @@ const ChatsView = () => {
   }, [call, incomingCall]);
 
   useEffect(() => {
-    if (active != null) fetchMessages(active).then(setMessages).catch(() => {});
+    if (active == null) return;
+    fetchMessages(active).then(setMessages).catch(() => {});
+    const interval = setInterval(() => {
+      fetchMessages(active).then(setMessages).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
   }, [active]);
 
   const openChat = (id: number) => {
