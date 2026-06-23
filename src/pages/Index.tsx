@@ -411,7 +411,7 @@ const AdminView = () => {
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [resetPass, setResetPass] = useState('');
 
-  const load = () => fetchUsers().then((d) => { setUsers(d.users); setAudit(d.audit); }).catch(() => {});
+  const load = () => fetchUsers().then((d) => { setUsers(d.users); setAudit(d.audit); }).catch((e) => { toast.error(e instanceof Error ? e.message : 'Ошибка загрузки пользователей'); });
   useEffect(() => { load(); }, []);
 
   const create = async () => {
