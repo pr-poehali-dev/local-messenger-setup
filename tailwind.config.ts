@@ -19,8 +19,9 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				sans: ['IBM Plex Sans', 'sans-serif'],
-				mono: ['IBM Plex Mono', 'monospace'],
+				sans: ['PT Sans', 'sans-serif'],
+				display: ['Oswald', 'sans-serif'],
+				mono: ['Oswald', 'monospace'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',
