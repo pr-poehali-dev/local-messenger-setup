@@ -1,23 +1,23 @@
 {
-  "name": "Локальный мессенджер",
-  "short_name": "Мессенджер",
-  "description": "Защищённый мессенджер для локального сервера",
+  "name": "CoonChat",
+  "short_name": "CoonChat",
+  "description": "Защищённый мессенджер CoonChat",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1d4ed8",
+  "background_color": "#121212",
+  "theme_color": "#2563eb",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/files/1c258462-afd1-494b-8d62-6f9b9eba843c.jpg",
+      "src": "https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/bucket/7cf0a125-afe0-4a0e-b726-aea598f66611.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/files/1c258462-afd1-494b-8d62-6f9b9eba843c.jpg",
+      "src": "https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/bucket/7cf0a125-afe0-4a0e-b726-aea598f66611.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

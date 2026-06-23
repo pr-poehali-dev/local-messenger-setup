@@ -10,7 +10,8 @@ import {
 
 type Tab = 'chats' | 'admin' | 'profile' | 'settings';
 
-const avatarColors = ['bg-blue-600', 'bg-rose-600', 'bg-slate-800', 'bg-indigo-600', 'bg-cyan-600'];
+const LOGO = 'https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/bucket/7cf0a125-afe0-4a0e-b726-aea598f66611.png';
+const avatarColors = ['bg-blue-600', 'bg-rose-600', 'bg-slate-700', 'bg-indigo-600', 'bg-cyan-700'];
 const initials = (name: string) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
 const Index = () => {
@@ -21,9 +22,8 @@ const Index = () => {
   return (
     <div className="flex h-screen bg-background text-foreground font-sans overflow-hidden">
       <aside className="w-16 md:w-20 shrink-0 border-r border-border flex flex-col items-center py-4 md:py-6 gap-1.5 bg-card">
-        <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl bg-primary flex items-center justify-center text-primary-foreground mb-3 shadow-sm relative">
-          <Icon name="Lock" size={18} />
-          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-destructive border-2 border-card" />
+        <div className="mb-2">
+          <img src={LOGO} alt="CoonChat" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
         </div>
         {([
           { id: 'chats', icon: 'MessageCircle', label: 'Чаты' },
@@ -90,7 +90,10 @@ const ChatsView = () => {
     <>
       <section className="w-64 md:w-80 shrink-0 border-r border-border flex flex-col bg-card">
         <header className="px-4 md:px-6 pt-5 pb-4">
-          <h1 className="font-display text-xl font-600 uppercase tracking-wide">Чаты</h1>
+          <div className="flex items-center gap-2.5">
+            <span className="w-0.5 h-5 rounded-full bg-red-500 inline-block" />
+            <h1 className="font-display text-xl font-600 uppercase tracking-wide">Чаты</h1>
+          </div>
           <div className="mt-3 relative">
             <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input placeholder="Поиск" className="w-full bg-secondary rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
@@ -188,8 +191,8 @@ const AdminView = () => {
   };
 
   const typeColor: Record<string, string> = {
-    create: 'text-blue-600 bg-blue-50', edit: 'text-slate-700 bg-slate-100',
-    block: 'text-destructive bg-destructive/10', view: 'text-indigo-600 bg-indigo-50',
+    create: 'text-blue-400 bg-blue-500/15', edit: 'text-slate-300 bg-slate-500/15',
+    block: 'text-red-400 bg-red-500/15', view: 'text-indigo-400 bg-indigo-500/15',
   };
   const typeIcon: Record<string, string> = { create: 'Plus', block: 'Ban', view: 'Eye', edit: 'Pencil' };
 
@@ -197,13 +200,19 @@ const AdminView = () => {
     <main className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-5xl mx-auto px-4 md:px-10 py-6 md:py-10 animate-slide-up">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
-          <h1 className="font-display text-2xl font-600 uppercase tracking-wide">Администрация</h1>
+          <div>
+            <div className="flex items-center gap-3 mb-0.5">
+              <span className="w-1 h-6 rounded-full bg-red-500 inline-block" />
+              <h1 className="font-display text-2xl font-600 uppercase tracking-wide">Администрация</h1>
+            </div>
+            <p className="text-sm text-muted-foreground ml-4">Управление пользователями · аудит · CoonChat</p>
+          </div>
           <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-display uppercase tracking-wide hover:opacity-90 transition-opacity">
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-display uppercase tracking-wide hover:bg-blue-500 transition-colors">
             <Icon name="UserPlus" size={16} /> Выдать аккаунт
           </button>
         </div>
-        <p className="text-sm text-muted-foreground mb-6">Управление пользователями, история и аудит действий</p>
+        <div className="mb-6" />
 
         {showForm && (
           <div className="bg-card border border-border rounded-xl p-5 mb-6 animate-fade-in">
@@ -255,8 +264,8 @@ const AdminView = () => {
                     <td className="px-5 py-3 font-medium">{u.display_name}</td>
                     <td className="px-5 py-3 text-muted-foreground">{u.role === 'admin' ? 'Админ' : u.role === 'moderator' ? 'Модератор' : 'Пользователь'}</td>
                     <td className="px-5 py-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${u.status === 'active' ? 'text-blue-600 bg-blue-50' : 'text-destructive bg-destructive/10'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-blue-600' : 'bg-destructive'}`} />
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${u.status === 'active' ? 'text-blue-400 bg-blue-500/15' : 'text-red-400 bg-red-500/15'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-blue-400' : 'bg-red-400'}`} />
                         {u.status === 'active' ? 'Активен' : 'Заблокирован'}
                       </span>
                     </td>
@@ -316,7 +325,10 @@ const ProfileView = ({ onUpdate }: { onUpdate: (u: User) => void }) => {
   return (
     <main className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-2xl mx-auto px-4 md:px-10 py-8 md:py-12 animate-slide-up">
-        <h1 className="font-display text-2xl font-600 uppercase tracking-wide mb-6">Профиль</h1>
+        <div className="flex items-center gap-3 mb-6">
+          <span className="w-1 h-6 rounded-full bg-red-500 inline-block" />
+          <h1 className="font-display text-2xl font-600 uppercase tracking-wide">Профиль</h1>
+        </div>
         <div className="bg-card border border-border rounded-xl p-6 md:p-8 flex items-center gap-5 mb-6">
           <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-2xl font-display">{initials(user?.display_name || '?')}</div>
           <div>
@@ -364,7 +376,10 @@ const ProfileView = ({ onUpdate }: { onUpdate: (u: User) => void }) => {
 const SettingsView = () => (
   <main className="flex-1 overflow-y-auto bg-background">
     <div className="max-w-2xl mx-auto px-4 md:px-10 py-8 md:py-12 animate-slide-up">
-      <h1 className="font-display text-2xl font-600 uppercase tracking-wide mb-6">Настройки</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <span className="w-1 h-6 rounded-full bg-red-500 inline-block" />
+        <h1 className="font-display text-2xl font-600 uppercase tracking-wide">Настройки</h1>
+      </div>
       <div className="bg-card border border-border rounded-xl divide-y divide-border">
         {[
           { icon: 'Bell', label: 'Уведомления', value: 'Включены' },
