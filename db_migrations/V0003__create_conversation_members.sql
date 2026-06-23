@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS conversation_members (id SERIAL PRIMARY KEY, conversation_id INTEGER NOT NULL REFERENCES conversations(id), user_id INTEGER NOT NULL REFERENCES users(id), UNIQUE(conversation_id, user_id))

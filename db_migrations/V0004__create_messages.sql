@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, conversation_id INTEGER NOT NULL REFERENCES conversations(id), sender_id INTEGER NOT NULL REFERENCES users(id), body TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT NOW())

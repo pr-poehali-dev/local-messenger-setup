@@ -1,0 +1,1 @@
+INSERT INTO users (login, display_name, password_hash, role, status) VALUES ('admin', 'Администратор', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'admin', 'active')
