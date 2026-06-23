@@ -24,7 +24,7 @@ def make_token(user_id: int, login: str) -> str:
 
 
 def handler(event, context):
-    '''Авторизация: вход по логину/паролю и проверка токена.'''
+    '''Авторизация: вход по логину/паролю, выдача токена.'''
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': cors_headers(), 'body': ''}
