@@ -68,36 +68,46 @@ const ChatsView = () => {
   const { user } = useAuth();
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [active, setActive] = useState<number | null>(null);
+  // mobileView: 'list' = список чатов, 'chat' = открытый диалог
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [newLogin, setNewLogin] = useState('');
   const [newLoading, setNewLoading] = useState(false);
+  // call = активный звонок (уже идёт), incomingCall = входящий (ждёт принятия)
   const [call, setCall] = useState<CallState | null>(null);
-  const incomingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [incomingCall, setIncomingCall] = useState<CallState | null>(null);
+  const convsRef = useRef<Conversation[]>([]);
   const lastSigIdRef = useRef<number>(0);
+  const callActiveRef = useRef(false);
 
   const loadConvs = () =>
     fetchConversations()
-      .then((c) => { setConvs(c); if (c[0] && active == null) setActive(c[0].id); })
+      .then((c) => {
+        setConvs(c);
+        convsRef.current = c;
+        if (c[0] && active == null) setActive(c[0].id);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
 
   useEffect(() => { loadConvs(); }, []);
 
-  // Polling входящих звонков по всем диалогам
+  // Polling входящих звонков — используем ref чтобы не пересоздавать интервал
   useEffect(() => {
-    if (call) return;
-    incomingPollRef.current = setInterval(async () => {
-      for (const conv of convs) {
+    const interval = setInterval(async () => {
+      if (callActiveRef.current) return;
+      const currentConvs = convsRef.current;
+      for (const conv of currentConvs) {
         if (!conv.other_user_id) continue;
         try {
           const sigs = await pollSignals(conv.id, lastSigIdRef.current);
+          if (sigs.length) lastSigIdRef.current = sigs[sigs.length - 1].id;
           const callSig = sigs.find(s => s.type === 'call' && s.sender_id !== user?.id);
           if (callSig) {
-            lastSigIdRef.current = callSig.id;
-            setCall({
+            setIncomingCall({
               conversationId: conv.id,
               recipientId: callSig.sender_id,
               recipientName: conv.title,
@@ -107,16 +117,25 @@ const ChatsView = () => {
             });
             break;
           }
-          if (sigs.length) lastSigIdRef.current = sigs[sigs.length - 1].id;
         } catch { /* ignore */ }
       }
     }, 2000);
-    return () => { if (incomingPollRef.current) clearInterval(incomingPollRef.current); };
-  }, [convs, call, user?.id]);
+    return () => clearInterval(interval);
+   
+  }, [user?.id]);
+
+  useEffect(() => {
+    callActiveRef.current = !!(call || incomingCall);
+  }, [call, incomingCall]);
 
   useEffect(() => {
     if (active != null) fetchMessages(active).then(setMessages).catch(() => {});
   }, [active]);
+
+  const openChat = (id: number) => {
+    setActive(id);
+    setMobileView('chat');
+  };
 
   const send = async () => {
     if (!text.trim() || active == null) return;
@@ -139,7 +158,7 @@ const ChatsView = () => {
       setShowNew(false);
       setNewLogin('');
       await loadConvs();
-      setActive(res.id);
+      openChat(res.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Ошибка');
     } finally {
@@ -149,129 +168,186 @@ const ChatsView = () => {
 
   const activeConv = convs.find((c) => c.id === active);
 
+  // Панель списка чатов
+  const sidebarEl = (
+    <section className={`
+      flex flex-col bg-card border-r border-border
+      md:w-80 md:shrink-0
+      ${mobileView === 'list' ? 'flex w-full' : 'hidden md:flex'}
+    `}>
+      <header className="px-4 md:px-6 pt-5 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-0.5 h-5 rounded-full bg-red-500 inline-block" />
+            <h1 className="font-display text-xl font-600 uppercase tracking-wide">Чаты</h1>
+          </div>
+          <button
+            onClick={() => setShowNew(!showNew)}
+            title="Новый диалог"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showNew ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+          >
+            <Icon name="SquarePen" size={16} />
+          </button>
+        </div>
+
+        {showNew && (
+          <div className="mt-3 animate-fade-in">
+            <p className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider">Логин собеседника</p>
+            <div className="flex gap-2">
+              <input
+                value={newLogin}
+                onChange={(e) => setNewLogin(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && startDialog()}
+                placeholder="например: ivan"
+                autoFocus
+                className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
+              />
+              <button
+                onClick={startDialog}
+                disabled={newLoading}
+                className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:bg-blue-500 transition-colors disabled:opacity-50"
+              >
+                {newLoading ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name="ArrowRight" size={15} />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 relative">
+          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input placeholder="Поиск" className="w-full bg-secondary rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+        </div>
+      </header>
+      <div className="flex-1 overflow-y-auto px-2 md:px-3 pb-4 space-y-1">
+        {loading && <p className="text-center text-xs text-muted-foreground py-8">Загрузка...</p>}
+        {!loading && convs.length === 0 && (
+          <p className="text-center text-xs text-muted-foreground py-8 px-4">Пока нет диалогов. Их создаёт администратор.</p>
+        )}
+        {convs.map((c, i) => (
+          <button key={c.id} onClick={() => openChat(c.id)}
+            className={`w-full flex items-center gap-3 p-2.5 md:p-3 rounded-xl text-left transition-colors ${active === c.id ? 'bg-accent' : 'hover:bg-secondary'}`}>
+            <div className={`w-10 h-10 md:w-11 md:h-11 shrink-0 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-sm font-semibold`}>
+              {initials(c.title)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-baseline">
+                <span className="font-medium text-sm truncate">{c.title}</span>
+                <span className="text-[11px] text-muted-foreground shrink-0 ml-2">{c.time}</span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{c.last}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+
+  // Панель диалога
+  const chatEl = (
+    <main className={`
+      flex-1 flex flex-col bg-background min-w-0
+      ${mobileView === 'chat' ? 'flex w-full' : 'hidden md:flex'}
+    `}>
+      {activeConv ? (
+        <>
+          <header className="h-[65px] border-b border-border px-4 md:px-6 flex items-center gap-3 bg-card">
+            {/* Кнопка назад — только мобильный */}
+            <button
+              onClick={() => setMobileView('list')}
+              className="md:hidden w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground -ml-1"
+            >
+              <Icon name="ChevronLeft" size={22} />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+              {initials(activeConv.title)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm truncate">{activeConv.title}</div>
+              <div className="text-xs text-primary">локальный сервер</div>
+            </div>
+            {activeConv.other_user_id && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => setCall({ conversationId: activeConv.id, recipientId: activeConv.other_user_id!, recipientName: activeConv.title, mode: 'audio', isIncoming: false })}
+                  className="w-9 h-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center justify-center transition-colors"
+                  title="Аудиозвонок">
+                  <Icon name="Phone" size={17} />
+                </button>
+                <button
+                  onClick={() => setCall({ conversationId: activeConv.id, recipientId: activeConv.other_user_id!, recipientName: activeConv.title, mode: 'video', isIncoming: false })}
+                  className="w-9 h-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center justify-center transition-colors"
+                  title="Видеозвонок">
+                  <Icon name="Video" size={17} />
+                </button>
+              </div>
+            )}
+          </header>
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-3">
+            {messages.map((m, i) => (
+              <div key={m.id} className={`flex ${m.me ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                style={{ animationDelay: `${Math.min(i, 8) * 40}ms`, animationFillMode: 'backwards' }}>
+                <div className={`max-w-[75%] md:max-w-[60%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${m.me ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-card border border-border rounded-bl-md'}`}>
+                  {!m.me && <span className="block text-[11px] font-semibold text-primary mb-0.5">{m.sender_name}</span>}
+                  {m.body}
+                  <span className={`block text-[10px] mt-1 ${m.me ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{m.time}</span>
+                </div>
+              </div>
+            ))}
+            {messages.length === 0 && <p className="text-center text-sm text-muted-foreground py-10">Нет сообщений</p>}
+          </div>
+          <footer className="p-3 md:p-4 border-t border-border bg-card">
+            <div className="flex items-center gap-2 bg-secondary rounded-xl px-2 md:px-3 py-1.5">
+              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
+                placeholder="Сообщение..." className="flex-1 bg-transparent outline-none text-sm py-2 px-2" />
+              <button onClick={send} className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity overflow-hidden">
+                <img src="https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/bucket/dac09d13-dd77-4b3e-8e81-f1d8889018fe.png" alt="send" className="w-7 h-7 object-contain invert" />
+              </button>
+            </div>
+          </footer>
+        </>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Выберите диалог</div>
+      )}
+    </main>
+  );
+
   return (
     <>
-      <section className="w-64 md:w-80 shrink-0 border-r border-border flex flex-col bg-card">
-        <header className="px-4 md:px-6 pt-5 pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="w-0.5 h-5 rounded-full bg-red-500 inline-block" />
-              <h1 className="font-display text-xl font-600 uppercase tracking-wide">Чаты</h1>
-            </div>
-            <button
-              onClick={() => setShowNew(!showNew)}
-              title="Новый диалог"
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showNew ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
-            >
-              <Icon name="SquarePen" size={16} />
-            </button>
-          </div>
+      {sidebarEl}
+      {chatEl}
 
-          {showNew && (
-            <div className="mt-3 animate-fade-in">
-              <p className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider">Логин собеседника</p>
-              <div className="flex gap-2">
-                <input
-                  value={newLogin}
-                  onChange={(e) => setNewLogin(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && startDialog()}
-                  placeholder="например: ivan"
-                  autoFocus
-                  className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
-                />
-                <button
-                  onClick={startDialog}
-                  disabled={newLoading}
-                  className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:bg-blue-500 transition-colors disabled:opacity-50"
-                >
-                  {newLoading ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name="ArrowRight" size={15} />}
-                </button>
-              </div>
+      {/* Входящий звонок — баннер принять/отклонить */}
+      {incomingCall && !call && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 flex flex-col items-center gap-5">
+            <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
+              <span className="text-3xl font-bold text-primary-foreground">{incomingCall.recipientName[0]?.toUpperCase()}</span>
             </div>
-          )}
-
-          <div className="mt-3 relative">
-            <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input placeholder="Поиск" className="w-full bg-secondary rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+            <div className="text-center">
+              <p className="font-semibold text-lg">{incomingCall.recipientName}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Входящий {incomingCall.mode === 'video' ? 'видеозвонок' : 'звонок'}...
+              </p>
+            </div>
+            <div className="flex gap-6">
+              <button
+                onClick={() => setIncomingCall(null)}
+                className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                title="Отклонить">
+                <Icon name="PhoneOff" size={22} />
+              </button>
+              <button
+                onClick={() => { setCall(incomingCall); setIncomingCall(null); }}
+                className="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors"
+                title="Принять">
+                <Icon name="Phone" size={22} />
+              </button>
+            </div>
           </div>
-        </header>
-        <div className="flex-1 overflow-y-auto px-2 md:px-3 pb-4 space-y-1">
-          {loading && <p className="text-center text-xs text-muted-foreground py-8">Загрузка...</p>}
-          {!loading && convs.length === 0 && (
-            <p className="text-center text-xs text-muted-foreground py-8 px-4">Пока нет диалогов. Их создаёт администратор.</p>
-          )}
-          {convs.map((c, i) => (
-            <button key={c.id} onClick={() => setActive(c.id)}
-              className={`w-full flex items-center gap-3 p-2.5 md:p-3 rounded-xl text-left transition-colors ${active === c.id ? 'bg-accent' : 'hover:bg-secondary'}`}>
-              <div className={`w-10 h-10 md:w-11 md:h-11 shrink-0 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-sm font-semibold`}>
-                {initials(c.title)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline">
-                  <span className="font-medium text-sm truncate">{c.title}</span>
-                  <span className="text-[11px] text-muted-foreground shrink-0 ml-2">{c.time}</span>
-                </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{c.last}</p>
-              </div>
-            </button>
-          ))}
         </div>
-      </section>
+      )}
 
-      <main className="flex-1 flex flex-col bg-background min-w-0">
-        {activeConv ? (
-          <>
-            <header className="h-[65px] border-b border-border px-4 md:px-6 flex items-center gap-3 bg-card">
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">{initials(activeConv.title)}</div>
-              <div className="flex-1">
-                <div className="font-medium text-sm">{activeConv.title}</div>
-                <div className="text-xs text-primary">локальный сервер</div>
-              </div>
-              {activeConv.other_user_id && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setCall({ conversationId: activeConv.id, recipientId: activeConv.other_user_id!, recipientName: activeConv.title, mode: 'audio', isIncoming: false })}
-                    className="w-9 h-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center justify-center transition-colors"
-                    title="Аудиозвонок">
-                    <Icon name="Phone" size={17} />
-                  </button>
-                  <button
-                    onClick={() => setCall({ conversationId: activeConv.id, recipientId: activeConv.other_user_id!, recipientName: activeConv.title, mode: 'video', isIncoming: false })}
-                    className="w-9 h-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center justify-center transition-colors"
-                    title="Видеозвонок">
-                    <Icon name="Video" size={17} />
-                  </button>
-                </div>
-              )}
-            </header>
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-3">
-              {messages.map((m, i) => (
-                <div key={m.id} className={`flex ${m.me ? 'justify-end' : 'justify-start'} animate-fade-in`}
-                  style={{ animationDelay: `${Math.min(i, 8) * 40}ms`, animationFillMode: 'backwards' }}>
-                  <div className={`max-w-[75%] md:max-w-[60%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${m.me ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-card border border-border rounded-bl-md'}`}>
-                    {!m.me && <span className="block text-[11px] font-semibold text-primary mb-0.5">{m.sender_name}</span>}
-                    {m.body}
-                    <span className={`block text-[10px] mt-1 ${m.me ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{m.time}</span>
-                  </div>
-                </div>
-              ))}
-              {messages.length === 0 && <p className="text-center text-sm text-muted-foreground py-10">Нет сообщений</p>}
-            </div>
-            <footer className="p-3 md:p-4 border-t border-border bg-card">
-              <div className="flex items-center gap-2 bg-secondary rounded-xl px-2 md:px-3 py-1.5">
-                <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
-                  placeholder="Сообщение..." className="flex-1 bg-transparent outline-none text-sm py-2 px-2" />
-                <button onClick={send} className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity overflow-hidden">
-                  <img src="https://cdn.poehali.dev/projects/2189e8a9-b402-49f2-9003-9d72d6b6b61a/bucket/dac09d13-dd77-4b3e-8e81-f1d8889018fe.png" alt="send" className="w-7 h-7 object-contain invert" />
-                </button>
-              </div>
-            </footer>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Выберите диалог</div>
-        )}
-      </main>
-
+      {/* Активный звонок */}
       {call && (
         <CallModal
           conversationId={call.conversationId}
