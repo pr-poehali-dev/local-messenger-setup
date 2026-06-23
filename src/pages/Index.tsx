@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import {
   fetchUsers, createAccount, setUserStatus, changePassword, updateProfile,
-  fetchConversations, fetchMessages, sendMessage,
+  fetchConversations, fetchMessages, sendMessage, createDialog,
   AdminUser, AuditEntry, Conversation, Message, User,
 } from '@/lib/api';
 
@@ -60,13 +60,17 @@ const ChatsView = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showNew, setShowNew] = useState(false);
+  const [newLogin, setNewLogin] = useState('');
+  const [newLoading, setNewLoading] = useState(false);
 
-  useEffect(() => {
+  const loadConvs = () =>
     fetchConversations()
-      .then((c) => { setConvs(c); if (c[0]) setActive(c[0].id); })
+      .then((c) => { setConvs(c); if (c[0] && active == null) setActive(c[0].id); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+
+  useEffect(() => { loadConvs(); }, []);
 
   useEffect(() => {
     if (active != null) fetchMessages(active).then(setMessages).catch(() => {});
@@ -84,16 +88,66 @@ const ChatsView = () => {
     }
   };
 
+  const startDialog = async () => {
+    if (!newLogin.trim()) return;
+    setNewLoading(true);
+    try {
+      const res = await createDialog(newLogin.trim());
+      toast.success(res.already_exists ? 'Диалог уже существует' : `Диалог с ${res.title} создан`);
+      setShowNew(false);
+      setNewLogin('');
+      await loadConvs();
+      setActive(res.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setNewLoading(false);
+    }
+  };
+
   const activeConv = convs.find((c) => c.id === active);
 
   return (
     <>
       <section className="w-64 md:w-80 shrink-0 border-r border-border flex flex-col bg-card">
-        <header className="px-4 md:px-6 pt-5 pb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="w-0.5 h-5 rounded-full bg-red-500 inline-block" />
-            <h1 className="font-display text-xl font-600 uppercase tracking-wide">Чаты</h1>
+        <header className="px-4 md:px-6 pt-5 pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-0.5 h-5 rounded-full bg-red-500 inline-block" />
+              <h1 className="font-display text-xl font-600 uppercase tracking-wide">Чаты</h1>
+            </div>
+            <button
+              onClick={() => setShowNew(!showNew)}
+              title="Новый диалог"
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showNew ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+            >
+              <Icon name="SquarePen" size={16} />
+            </button>
           </div>
+
+          {showNew && (
+            <div className="mt-3 animate-fade-in">
+              <p className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider">Логин собеседника</p>
+              <div className="flex gap-2">
+                <input
+                  value={newLogin}
+                  onChange={(e) => setNewLogin(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && startDialog()}
+                  placeholder="например: ivan"
+                  autoFocus
+                  className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
+                />
+                <button
+                  onClick={startDialog}
+                  disabled={newLoading}
+                  className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:bg-blue-500 transition-colors disabled:opacity-50"
+                >
+                  {newLoading ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name="ArrowRight" size={15} />}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-3 relative">
             <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input placeholder="Поиск" className="w-full bg-secondary rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30" />

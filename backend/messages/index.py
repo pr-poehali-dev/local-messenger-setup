@@ -76,6 +76,51 @@ def handler(event, context):
     body = json.loads(event.get('body') or '{}')
     action = body.get('action')
 
+    if action == 'create_dialog':
+        target_login = (body.get('target_login') or '').strip()
+        if not target_login:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Укажите логин пользователя'})}
+        cur.execute("SELECT id, display_name, status FROM users WHERE login = %s", (target_login,))
+        target = cur.fetchone()
+        if not target:
+            cur.close(); conn.close()
+            return {'statusCode': 404, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Пользователь не найден'})}
+        if target[2] != 'active':
+            cur.close(); conn.close()
+            return {'statusCode': 403, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Пользователь недоступен'})}
+        if target[0] == uid:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Нельзя создать диалог с собой'})}
+        # Проверяем, нет ли уже личного диалога между этими двумя
+        cur.execute(
+            "SELECT c.id FROM conversations c "
+            "JOIN conversation_members cm1 ON cm1.conversation_id = c.id AND cm1.user_id = %s "
+            "JOIN conversation_members cm2 ON cm2.conversation_id = c.id AND cm2.user_id = %s "
+            "WHERE c.is_group = FALSE",
+            (uid, target[0])
+        )
+        existing = cur.fetchone()
+        if existing:
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': cors_headers(),
+                    'body': json.dumps({'id': existing[0], 'already_exists': True})}
+        cur.execute("SELECT display_name FROM users WHERE id = %s", (uid,))
+        my_name = cur.fetchone()[0]
+        title = target[1]
+        cur.execute("INSERT INTO conversations (title, is_group) VALUES (%s, FALSE) RETURNING id", (title,))
+        conv_id = cur.fetchone()[0]
+        cur.execute("INSERT INTO conversation_members (conversation_id, user_id) VALUES (%s, %s)", (conv_id, uid))
+        cur.execute("INSERT INTO conversation_members (conversation_id, user_id) VALUES (%s, %s)", (conv_id, target[0]))
+        conn.commit()
+        cur.close(); conn.close()
+        return {'statusCode': 200, 'headers': cors_headers(),
+                'body': json.dumps({'id': conv_id, 'title': title, 'ok': True})}
+
     if action == 'send':
         conv_id = body.get('conversation_id')
         text = (body.get('body') or '').strip()

@@ -142,3 +142,14 @@ export async function sendMessage(conversationId: number, body: string) {
   if (!res.ok) throw new Error(data.error || 'Ошибка');
   return data;
 }
+
+export async function createDialog(targetLogin: string) {
+  const res = await fetch(API.messages, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ action: 'create_dialog', target_login: targetLogin }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Ошибка');
+  return data as { id: number; title: string; ok: boolean; already_exists?: boolean };
+}
