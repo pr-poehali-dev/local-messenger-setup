@@ -78,13 +78,31 @@ def handler(event, context):
     body = json.loads(event.get('body') or '{}')
     action = body.get('action')
 
+    if action == 'search_users':
+        q = (body.get('q') or '').strip()
+        if len(q) < 1:
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': cors_headers(),
+                    'body': json.dumps({'users': []})}
+        cur.execute(
+            "SELECT id, login, display_name FROM users "
+            "WHERE status = 'active' AND id != %s "
+            "AND (lower(login) LIKE lower(%s) OR lower(display_name) LIKE lower(%s)) "
+            "LIMIT 10",
+            (uid, f'%{q}%', f'%{q}%')
+        )
+        users = [{'id': r[0], 'login': r[1], 'name': r[2]} for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return {'statusCode': 200, 'headers': cors_headers(),
+                'body': json.dumps({'users': users})}
+
     if action == 'create_dialog':
         target_login = (body.get('target_login') or '').strip()
         if not target_login:
             cur.close(); conn.close()
             return {'statusCode': 400, 'headers': cors_headers(),
                     'body': json.dumps({'error': 'Укажите логин пользователя'})}
-        cur.execute("SELECT id, display_name, status FROM users WHERE login = %s", (target_login,))
+        cur.execute("SELECT id, display_name, status FROM users WHERE lower(login) = lower(%s)", (target_login,))
         target = cur.fetchone()
         if not target:
             cur.close(); conn.close()

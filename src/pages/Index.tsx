@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import {
   fetchUsers, createAccount, setUserStatus, changePassword, updateProfile,
-  fetchConversations, fetchMessages, sendMessage, createDialog, pollSignals,
+  fetchConversations, fetchMessages, sendMessage, createDialog, pollSignals, searchUsers,
   AdminUser, AuditEntry, Conversation, Message, User,
 } from '@/lib/api';
 import CallModal, { CallMode } from '@/components/CallModal';
@@ -76,6 +76,7 @@ const ChatsView = () => {
   const [showNew, setShowNew] = useState(false);
   const [newLogin, setNewLogin] = useState('');
   const [newLoading, setNewLoading] = useState(false);
+  const [userResults, setUserResults] = useState<{ id: number; login: string; name: string }[]>([]);
   const [search, setSearch] = useState('');
   // call = активный звонок (уже идёт), incomingCall = входящий (ждёт принятия)
   const [call, setCall] = useState<CallState | null>(null);
@@ -155,14 +156,23 @@ const ChatsView = () => {
     }
   };
 
-  const startDialog = async () => {
-    if (!newLogin.trim()) return;
+  const onNewLoginChange = async (val: string) => {
+    setNewLogin(val);
+    if (val.trim().length < 1) { setUserResults([]); return; }
+    try {
+      const results = await searchUsers(val.trim());
+      setUserResults(results);
+    } catch { setUserResults([]); }
+  };
+
+  const startDialog = async (login: string, name: string) => {
     setNewLoading(true);
     try {
-      const res = await createDialog(newLogin.trim());
-      toast.success(res.already_exists ? 'Диалог уже существует' : `Диалог с ${res.title} создан`);
+      const res = await createDialog(login);
+      toast.success(res.already_exists ? `Диалог с ${name} уже существует` : `Диалог с ${name} создан`);
       setShowNew(false);
       setNewLogin('');
+      setUserResults([]);
       await loadConvs();
       openChat(res.id);
     } catch (e) {
@@ -197,25 +207,38 @@ const ChatsView = () => {
         </div>
 
         {showNew && (
-          <div className="mt-3 animate-fade-in">
-            <p className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider">Логин собеседника</p>
-            <div className="flex gap-2">
+          <div className="mt-3 animate-fade-in relative">
+            <p className="text-[11px] text-muted-foreground mb-1.5 uppercase tracking-wider">Поиск пользователя</p>
+            <div className="relative">
+              <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={newLogin}
-                onChange={(e) => setNewLogin(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && startDialog()}
-                placeholder="например: ivan"
+                onChange={(e) => onNewLoginChange(e.target.value)}
+                placeholder="Имя или логин..."
                 autoFocus
-                className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
+                className="w-full bg-secondary rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
               />
-              <button
-                onClick={startDialog}
-                disabled={newLoading}
-                className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:bg-blue-500 transition-colors disabled:opacity-50"
-              >
-                {newLoading ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name="ArrowRight" size={15} />}
-              </button>
+              {newLoading && <Icon name="Loader2" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
             </div>
+            {userResults.length > 0 && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+                {userResults.map(u => (
+                  <button key={u.id} onClick={() => startDialog(u.login, u.name)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                      {initials(u.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{u.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{u.login}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {newLogin.trim().length > 0 && userResults.length === 0 && !newLoading && (
+              <p className="text-xs text-muted-foreground mt-2 px-1">Пользователи не найдены</p>
+            )}
           </div>
         )}
 

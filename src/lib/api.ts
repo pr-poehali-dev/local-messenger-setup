@@ -144,6 +144,16 @@ export async function sendMessage(conversationId: number, body: string) {
   return data;
 }
 
+export async function searchUsers(q: string): Promise<{ id: number; login: string; name: string }[]> {
+  const res = await fetch(API.messages, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ action: 'search_users', q }),
+  });
+  const data = await res.json();
+  return data.users || [];
+}
+
 export async function createDialog(targetLogin: string) {
   const res = await fetch(API.messages, {
     method: 'POST',
