@@ -1,6 +1,7 @@
 import json
 import os
 import hashlib
+import base64
 import psycopg2
 
 def hash_password(password: str) -> str:
@@ -84,7 +85,15 @@ def handler(event, context):
         return {'statusCode': 200, 'headers': cors_headers(),
                 'body': json.dumps({'users': users, 'audit': audit})}
 
-    body = json.loads(event.get('body') or '{}')
+    try:
+        raw_body = event.get('body') or '{}'
+        if event.get('isBase64Encoded'):
+            raw_body = base64.b64decode(raw_body).decode('utf-8')
+        body = json.loads(raw_body)
+    except Exception:
+        cur.close(); conn.close()
+        return {'statusCode': 400, 'headers': cors_headers(),
+                'body': json.dumps({'error': 'Неверный формат запроса'})}
     action = body.get('action')
 
     if action == 'create':

@@ -82,7 +82,11 @@ def handler(event, context):
         return {'statusCode': 200, 'headers': cors_headers(),
                 'body': json.dumps({'conversations': convs})}
 
-    body = json.loads(event.get('body') or '{}')
+    import base64
+    raw_body = event.get('body') or '{}'
+    if event.get('isBase64Encoded'):
+        raw_body = base64.b64decode(raw_body).decode('utf-8')
+    body = json.loads(raw_body)
     action = body.get('action')
 
     if action == 'search_users':

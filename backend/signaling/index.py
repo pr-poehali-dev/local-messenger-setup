@@ -70,7 +70,11 @@ def handler(event, context):
                 'body': json.dumps({'signals': signals})}
 
     if method == 'POST':
-        body = json.loads(event.get('body') or '{}')
+        import base64
+        raw_body = event.get('body') or '{}'
+        if event.get('isBase64Encoded'):
+            raw_body = base64.b64decode(raw_body).decode('utf-8')
+        body = json.loads(raw_body)
         conv_id = body.get('conversation_id')
         recipient_id = body.get('recipient_id')
         sig_type = body.get('type')
