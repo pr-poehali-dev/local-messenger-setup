@@ -76,6 +76,7 @@ const ChatsView = () => {
   const [showNew, setShowNew] = useState(false);
   const [newLogin, setNewLogin] = useState('');
   const [newLoading, setNewLoading] = useState(false);
+  const [search, setSearch] = useState('');
   // call = активный звонок (уже идёт), incomingCall = входящий (ждёт принятия)
   const [call, setCall] = useState<CallState | null>(null);
   const [incomingCall, setIncomingCall] = useState<CallState | null>(null);
@@ -220,7 +221,12 @@ const ChatsView = () => {
 
         <div className="mt-3 relative">
           <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input placeholder="Поиск" className="w-full bg-secondary rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск"
+            className="w-full bg-secondary rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          />
         </div>
       </header>
       <div className="flex-1 overflow-y-auto px-2 md:px-3 pb-4 space-y-1">
@@ -228,7 +234,10 @@ const ChatsView = () => {
         {!loading && convs.length === 0 && (
           <p className="text-center text-xs text-muted-foreground py-8 px-4">Пока нет диалогов. Их создаёт администратор.</p>
         )}
-        {convs.map((c, i) => (
+        {!loading && convs.length > 0 && search && convs.filter(c => c.title.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+          <p className="text-center text-xs text-muted-foreground py-8 px-4">Ничего не найдено</p>
+        )}
+        {convs.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase())).map((c, i) => (
           <button key={c.id} onClick={() => openChat(c.id)}
             className={`w-full flex items-center gap-3 p-2.5 md:p-3 rounded-xl text-left transition-colors ${active === c.id ? 'bg-accent' : 'hover:bg-secondary'}`}>
             <div className={`w-10 h-10 md:w-11 md:h-11 shrink-0 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-sm font-semibold`}>
