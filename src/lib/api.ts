@@ -45,8 +45,10 @@ export interface Message {
 
 function authHeaders(): Record<string, string> {
   const uid = localStorage.getItem('userId');
+  const token = localStorage.getItem('token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (uid) headers['X-User-Id'] = uid;
+  if (token) headers['X-Auth-Token'] = token;
   return headers;
 }
 
@@ -89,6 +91,17 @@ export async function setUserStatus(userId: number, status: string) {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ action: 'set_status', user_id: userId, status }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Ошибка');
+  return data;
+}
+
+export async function resetUserPassword(userId: number, newPassword: string) {
+  const res = await fetch(API.users, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ action: 'reset_password', user_id: userId, new_password: newPassword }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Ошибка');

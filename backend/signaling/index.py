@@ -16,6 +16,13 @@ def cors_headers():
 
 def get_uid(headers):
     uid = headers.get('X-User-Id') or headers.get('x-user-id')
+    if not uid:
+        token = headers.get('X-Auth-Token') or headers.get('x-auth-token')
+        if token and '.' in token:
+            try:
+                uid = token.rsplit('.', 1)[1]
+            except Exception:
+                return None
     return int(uid) if uid else None
 
 

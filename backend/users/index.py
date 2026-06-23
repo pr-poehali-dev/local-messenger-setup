@@ -20,6 +20,14 @@ def cors_headers():
 def get_actor(cur, headers):
     uid = headers.get('X-User-Id') or headers.get('x-user-id')
     if not uid:
+        # Пробуем извлечь user_id из токена вида sha256hex.{user_id}
+        token = headers.get('X-Auth-Token') or headers.get('x-auth-token')
+        if token and '.' in token:
+            try:
+                uid = token.rsplit('.', 1)[1]
+            except Exception:
+                return None
+    if not uid:
         return None
     cur.execute("SELECT id, login, role FROM users WHERE id = %s", (int(uid),))
     return cur.fetchone()
@@ -135,6 +143,31 @@ def handler(event, context):
         conn.commit()
         cur.close()
         conn.close()
+        return {'statusCode': 200, 'headers': cors_headers(),
+                'body': json.dumps({'ok': True})}
+
+    if action == 'reset_password':
+        if actor_role != 'admin':
+            cur.close(); conn.close()
+            return {'statusCode': 403, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Недостаточно прав'})}
+        target_id = body.get('user_id')
+        new_pass = body.get('new_password') or ''
+        if len(new_pass) < 4:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Пароль слишком короткий'})}
+        cur.execute("SELECT login FROM users WHERE id = %s", (target_id,))
+        trow = cur.fetchone()
+        if not trow:
+            cur.close(); conn.close()
+            return {'statusCode': 404, 'headers': cors_headers(),
+                    'body': json.dumps({'error': 'Пользователь не найден'})}
+        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s",
+                    (hash_password(new_pass), target_id))
+        log_audit(cur, actor_login, 'Сброс пароля', trow[0], 'edit')
+        conn.commit()
+        cur.close(); conn.close()
         return {'statusCode': 200, 'headers': cors_headers(),
                 'body': json.dumps({'ok': True})}
 

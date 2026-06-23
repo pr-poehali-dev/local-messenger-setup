@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   fetchUsers, createAccount, setUserStatus, changePassword, updateProfile,
   fetchConversations, fetchMessages, sendMessage, createDialog, pollSignals, searchUsers,
+  resetUserPassword,
   AdminUser, AuditEntry, Conversation, Message, User,
 } from '@/lib/api';
 import CallModal, { CallMode } from '@/components/CallModal';
@@ -407,6 +408,8 @@ const AdminView = () => {
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ login: '', display_name: '', password: '', role: 'user' });
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [resetPass, setResetPass] = useState('');
 
   const load = () => fetchUsers().then((d) => { setUsers(d.users); setAudit(d.audit); }).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -427,6 +430,16 @@ const AdminView = () => {
     catch (e) { toast.error(e instanceof Error ? e.message : 'Ошибка'); }
   };
 
+  const doResetPass = async () => {
+    if (!resetTarget || resetPass.length < 4) { toast.error('Пароль слишком короткий'); return; }
+    try {
+      await resetUserPassword(resetTarget.id, resetPass);
+      toast.success(`Пароль для ${resetTarget.login} изменён`);
+      setResetTarget(null);
+      setResetPass('');
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Ошибка'); }
+  };
+
   const typeColor: Record<string, string> = {
     create: 'text-blue-400 bg-blue-500/15', edit: 'text-slate-300 bg-slate-500/15',
     block: 'text-red-400 bg-red-500/15', view: 'text-indigo-400 bg-indigo-500/15',
@@ -434,6 +447,7 @@ const AdminView = () => {
   const typeIcon: Record<string, string> = { create: 'Plus', block: 'Ban', view: 'Eye', edit: 'Pencil' };
 
   return (
+    <>
     <main className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-5xl mx-auto px-4 md:px-10 py-6 md:py-10 animate-slide-up">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
@@ -507,11 +521,17 @@ const AdminView = () => {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      {u.login !== user?.login && (
-                        <button onClick={() => toggleStatus(u)} className="text-xs text-muted-foreground hover:text-destructive">
-                          {u.status === 'active' ? 'Заблокировать' : 'Разблокировать'}
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={() => { setResetTarget(u); setResetPass(''); }}
+                          className="text-xs text-muted-foreground hover:text-primary">
+                          Сбросить пароль
                         </button>
-                      )}
+                        {u.login !== user?.login && (
+                          <button onClick={() => toggleStatus(u)} className="text-xs text-muted-foreground hover:text-destructive">
+                            {u.status === 'active' ? 'Заблокировать' : 'Разблокировать'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -538,6 +558,29 @@ const AdminView = () => {
         </div>
       </div>
     </main>
+
+    {resetTarget && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
+          <h2 className="font-display uppercase text-sm tracking-wide">Сброс пароля</h2>
+          <p className="text-sm text-muted-foreground">Новый пароль для <span className="font-mono text-foreground">{resetTarget.login}</span></p>
+          <input
+            type="password"
+            value={resetPass}
+            onChange={(e) => setResetPass(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && doResetPass()}
+            placeholder="Новый пароль (мин. 4 символа)"
+            autoFocus
+            className="w-full bg-secondary rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <div className="flex gap-2">
+            <button onClick={doResetPass} className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 flex-1">Сохранить</button>
+            <button onClick={() => { setResetTarget(null); setResetPass(''); }} className="bg-secondary px-4 py-2 rounded-lg text-sm">Отмена</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
